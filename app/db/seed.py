@@ -19,7 +19,6 @@ HOUSE_ACCOUNTS: tuple[tuple[str, AccountType, Side], ...] = (
     ("Cash", AccountType.ASSET, Side.DEBIT),
     ("Card Processing Fees", AccountType.EXPENSE, Side.DEBIT),
     ("Fee Revenue", AccountType.REVENUE, Side.CREDIT),
-    ("Owner Equity", AccountType.EQUITY, Side.CREDIT),
 )
 
 FIRST_USER_ID = 1

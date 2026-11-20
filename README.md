@@ -28,7 +28,6 @@
 | User Wallet (per user) | Cash held on behalf of a user | Liability | Credit |
 | Card Processing Fees | Transaction expenses paid to processor | Expense | Debit |
 | Fee Revenue | Revenue from fees charged to users | Revenue | Credit |
-| Owner Equity *(add)* | Capital that covers shortfalls (e.g. absorbed fees) | Equity | Credit |
 
 ---
 
@@ -71,10 +70,10 @@ Balanced: 294 + 6 = 300.
 2. **Accounting equation:**
 
    ```
-   Cash = Σ User Wallets + Fee Revenue − Expenses + Owner Equity
+   Cash = Σ User Wallets + Fee Revenue − Expenses
    ```
 
-   ⚠️ "Sum of user balances = cash in bank" alone does **not** hold. After the deposit above, users are owed 300 but we hold 294. The 6 gap is the absorbed expense and must be covered by revenue or owner equity.
+   ⚠️ "Sum of user balances = cash in bank" alone does **not** hold. After the deposit above, users are owed 300 but we hold 294. The 6 gap is the absorbed expense, and it shows up on the expense side of the equation above.
 
 3. **No user wallet goes negative.**
 
