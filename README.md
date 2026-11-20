@@ -29,7 +29,6 @@
 | Card Processing Fees | Transaction expenses paid to processor | Expense | Debit |
 | Fee Revenue | Revenue from fees charged to users | Revenue | Credit |
 | Owner Equity *(add)* | Capital that covers shortfalls (e.g. absorbed fees) | Equity | Credit |
-| Processor Receivable *(optional)* | Card funds not yet settled to bank | Asset | Debit |
 
 ---
 
@@ -54,23 +53,6 @@ Debiting A's wallet reduces what we owe A. Crediting B's wallet increases what w
 
 Balanced: 294 + 6 = 300.
 
-**More realistic version (card settles later):**
-
-At deposit time:
-
-| Account | Debit | Credit |
-|---|---|---|
-| Processor Receivable | 294 | |
-| Card Processing Fees | 6 | |
-| A Wallet | | 300 |
-
-At settlement:
-
-| Account | Debit | Credit |
-|---|---|---|
-| Cash | 294 | |
-| Processor Receivable | | 294 |
-
 ### 3. Withdrawal — User A withdraws 100 with a 2 fee on top
 
 | Account | Debit | Credit |
@@ -89,7 +71,7 @@ At settlement:
 2. **Accounting equation:**
 
    ```
-   Cash (+ Receivables) = Σ User Wallets + Fee Revenue − Expenses + Owner Equity
+   Cash = Σ User Wallets + Fee Revenue − Expenses + Owner Equity
    ```
 
    ⚠️ "Sum of user balances = cash in bank" alone does **not** hold. After the deposit above, users are owed 300 but we hold 294. The 6 gap is the absorbed expense and must be covered by revenue or owner equity.

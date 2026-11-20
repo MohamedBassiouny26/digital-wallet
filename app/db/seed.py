@@ -17,7 +17,6 @@ from app.db.session import session_scope
 # (name, type, normal_side) for the accounts in the README's chart of accounts.
 HOUSE_ACCOUNTS: tuple[tuple[str, AccountType, Side], ...] = (
     ("Cash", AccountType.ASSET, Side.DEBIT),
-    ("Processor Receivable", AccountType.ASSET, Side.DEBIT),
     ("Card Processing Fees", AccountType.EXPENSE, Side.DEBIT),
     ("Fee Revenue", AccountType.REVENUE, Side.CREDIT),
     ("Owner Equity", AccountType.EQUITY, Side.CREDIT),
