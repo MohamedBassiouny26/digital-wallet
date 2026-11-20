@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wallet-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wallet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wallet}
+      POSTGRES_DB: ${POSTGRES_DB:-wallet}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wallet} -d ${POSTGRES_DB:-wallet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [wallet]
+
+  restate:
+    image: docker.io/restatedev/restate:1.6
+    container_name: wallet-restate
+    ports:
+      - "8080:8080"   # ingress — invoke handlers
+      - "9070:9070"   # admin — register deployments
+      - "9071:9071"   # node-to-node / internal
+    volumes:
+      - restate-data:/restate-data
+    environment:
+      RESTATE_LOG_FILTER: ${RESTATE_LOG_FILTER:-restate=info}
+    healthcheck:
+      test: ["CMD", "restatectl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [wallet]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wallet-api
+    command: ["python", "-m", "app"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wallet}:${POSTGRES_PASSWORD:-wallet}@postgres:5432/${POSTGRES_DB:-wallet}
+      RESTATE_INGRESS_URL: http://restate:8080
+      RESTATE_ADMIN_URL: http://restate:9070
+      PORT: 9080
+    ports:
+      - "9080:9080"   # restate SDK endpoint (handlers)
+    volumes:
+      - ./app:/srv/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      restate:
+        condition: service_started
+    networks: [wallet]
+
+  # One-shot: registers the api deployment with the Restate server.
+  # Run after `api` is up:  docker compose run --rm register
+  register:
+    image: docker.io/restatedev/restate-cli:1.6
+    container_name: wallet-register
+    entrypoint: ["restate", "-y", "--base-url", "http://restate:9070", "deployments", "register", "http://api:9080"]
+    depends_on: [restate, api]
+    profiles: [tools]
+    networks: [wallet]
+
+volumes:
+  postgres-data:
+  restate-data:
+
+networks:
+  wallet:
+    driver: bridge

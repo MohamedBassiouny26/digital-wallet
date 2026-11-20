@@ -1,0 +1,18 @@
+# --- Restate (durable execution) ---
+restate-sdk[serde]>=1.2.0
+
+# --- API / app ---
+fastapi>=0.115.0
+hypercorn>=0.17.3
+pydantic>=2.10.6
+pydantic-settings>=2.6.0
+httpx>=0.28.0
+
+# --- Database (Postgres) ---
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+alembic>=1.14.0
+psycopg[binary]>=3.2.0   # sync driver, used by alembic/scripts
+
+# --- Config ---
+python-dotenv>=1.0.1
