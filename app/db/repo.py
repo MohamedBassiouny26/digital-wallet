@@ -61,6 +61,19 @@ async def get_users_accounts(
     result = await session.execute(stmt)
     return result.scalars().all()
 
+async def get_withdrawal_accounts(
+    session: AsyncSession, user_id: int
+) -> Sequence[Account]:
+    """The three accounts a deposit posts to: the user's wallet, Cash, and fees."""
+    stmt = select(Account).where(
+        or_(
+            Account.user_id == user_id,
+            Account.name.in_(("Fee Revenue", "Cash")),
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
 
 ### Transactions
 async def create_transaction(session: AsyncSession, transaction) -> int | None:

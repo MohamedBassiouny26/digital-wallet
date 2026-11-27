@@ -21,6 +21,7 @@ from app.db.repo import (
     get_transaction_id_by_idempotency_key,
     get_user_balance,
     get_users_accounts,
+    get_withdrawal_accounts,
 )
 from app.db.seed import wallet_name
 from app.db.session import session_scope
@@ -34,12 +35,15 @@ from app.models.transactions import (
     TransactionKind,
     TransferCreate,
     TransferResponse,
+    WithdrawCreate,
+    WithdrawResponse,
 )
 
 CASH_ACCOUNT = "Cash"
 FEES_ACCOUNT = "Card Processing Fees"
 
 DEPOSIT_FEE_PERCENT = 2
+WITHDRAWAL_FEE_PERCENT = 1
 
 
 class Operation:
@@ -206,3 +210,70 @@ async def read_user_balance(user_id: int) -> AccountBalance:
     """Read a user's wallet balance in its own session."""
     async with session_scope() as session:
         return await get_user_balance(session, user_id)
+
+async def post_withdraw(withdraw: WithdrawCreate, idempotency_key: str)-> WithdrawResponse:
+    fees= withdraw.amount * DEPOSIT_FEE_PERCENT // 100
+    net_amount = withdraw.amount - fees
+    async with session_scope() as session:
+        accounts = await get_withdrawal_accounts(
+            session,withdraw.user_id 
+        )
+        user_account = _account_by_name(accounts, wallet_name(user_id=withdraw.user_id))
+        cash_account = _account_by_name(accounts, CASH_ACCOUNT)
+        revenue_account = _account_by_name(accounts, "Fee Revenue")
+
+        transaction_id = await create_transaction(
+            session,
+            TransactionCreate(
+                amount=withdraw.amount,
+                user_id=withdraw.user_id,
+                kind=TransactionKind.WITHDRAWAL,
+                idempotency_key=idempotency_key,
+            ),
+        )
+        if transaction_id is None:
+            transaction_id = await get_transaction_id_by_idempotency_key(
+                session, idempotency_key
+            )
+            return WithdrawResponse(
+                transaction_id=transaction_id,
+                amount=withdraw.amount,
+                fees=0
+            )
+        # create depit entry for user account
+        # create depit entry for cash account
+        # create credit entry for revenue account
+
+        await create_entry(
+            session,
+            EntryCreate(
+                transaction_id=transaction_id,
+                account_id=user_account.id,
+                side=_side_for(user_account, Operation.SUBTRACT),
+                amount=withdraw.amount,
+            ),
+        )
+        await create_entry(
+            session,
+            EntryCreate(
+                transaction_id=transaction_id,
+                account_id=cash_account.id,
+                side=_side_for(cash_account, Operation.SUBTRACT),
+                amount=net_amount,
+            ),
+        )
+        await create_entry(
+            session,
+            EntryCreate(
+                transaction_id=transaction_id,
+                account_id=revenue_account.id,
+                side=_side_for(revenue_account, Operation.ADD),
+                amount=fees,
+            ),
+        )
+
+    return WithdrawResponse(
+        transaction_id=transaction_id,
+        amount=net_amount,
+        fees=fees
+    )

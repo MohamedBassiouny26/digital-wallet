@@ -42,3 +42,13 @@ class TransferResponse(BaseModel):
     amount: int
 
     model_config = ConfigDict(from_attributes=True)
+
+class WithdrawCreate(BaseModel):
+    amount: int
+    user_id: int
+class WithdrawResponse(BaseModel):
+    amount: int
+    fees: int
+    transaction_id: int
+
+

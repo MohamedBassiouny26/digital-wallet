@@ -1,11 +1,13 @@
 import restate
 
-from app.db.postings import post_deposit, post_transfer
+from app.db.postings import post_deposit, post_transfer, post_withdraw
 from app.models.transactions import (
     DepositCreate,
     DepositResponse,
     TransferCreate,
     TransferResponse,
+    WithdrawCreate,
+    WithdrawResponse,
 )
 
 transaction_service = restate.Service("transaction_service")
@@ -39,5 +41,14 @@ async def transfer(ctx: restate.Context, req: TransferCreate) -> TransferRespons
         "post-transfer",
         post_transfer,
         transfer=req,
+        idempotency_key=_idempotency_key(ctx),
+    )
+
+@transaction_service.handler()
+async def withdraw(ctx: restate.Context, req: WithdrawCreate) -> WithdrawResponse:
+    return await ctx.run_typed(
+        "post-withdraw",
+        post_withdraw,
+        withdraw=req,
         idempotency_key=_idempotency_key(ctx),
     )
