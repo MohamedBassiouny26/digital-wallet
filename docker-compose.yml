@@ -17,9 +17,36 @@ services:
       retries: 10
     networks: [wallet]
 
+  # Web UI for the ledger database: http://localhost:5050
+  # Pre-connected to the `postgres` service; no login or password prompts.
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: wallet-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@wallet.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      # Pre-registered server + its password, so the tree is ready on first load.
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgpass:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: [tools]
+    networks: [wallet]
+
   restate:
-    image: docker.io/restatedev/restate:1.6
+    image: docker.io/restatedev/restate:1.8
     container_name: wallet-restate
+    # Pin the node name: it defaults to the hostname (the container id),
+    # which changes on every recreate and makes Restate refuse the
+    # existing /restate-data.
+    hostname: wallet-restate
     ports:
       - "8080:8080"   # ingress — invoke handlers
       - "9070:9070"   # admin — register deployments
@@ -28,6 +55,11 @@ services:
       - restate-data:/restate-data
     environment:
       RESTATE_LOG_FILTER: ${RESTATE_LOG_FILTER:-restate=info}
+      RESTATE_NODE_NAME: wallet-restate
+      # The UI runs in the host browser and invokes handlers through this URL.
+      # Without it Restate advertises its container IP (172.x), which the
+      # browser cannot reach -> "Network Error occurred." in the playground.
+      RESTATE_INGRESS__ADVERTISED_INGRESS_ENDPOINT: http://localhost:8080/
     healthcheck:
       test: ["CMD", "restatectl", "status"]
       interval: 5s
@@ -48,6 +80,18 @@ services:
       PORT: 9080
     ports:
       - "9080:9080"   # restate SDK endpoint (handlers)
+    # The SDK endpoint answers /health once Hypercorn is serving. No curl in
+    # the slim image, so probe with the interpreter we already have.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:9080/health')
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
     volumes:
       - ./app:/srv/app
     depends_on:
@@ -57,19 +101,35 @@ services:
         condition: service_started
     networks: [wallet]
 
-  # One-shot: registers the api deployment with the Restate server.
-  # Run after `api` is up:  docker compose run --rm register
+  # One-shot: registers the api deployment with the Restate server, then exits.
+  # Runs automatically on `docker compose up` once both sides are healthy.
+  # --force re-registers after a handler change instead of failing on a
+  # already-registered endpoint, which would otherwise retry forever.
   register:
-    image: docker.io/restatedev/restate-cli:1.6
+    image: docker.io/restatedev/restate-cli:1.8
     container_name: wallet-register
-    entrypoint: ["restate", "-y", "--base-url", "http://restate:9070", "deployments", "register", "http://api:9080"]
-    depends_on: [restate, api]
-    profiles: [tools]
+    # The CLI takes the admin address from RESTATE_ADMIN_URL, not a flag.
+    environment:
+      RESTATE_ADMIN_URL: http://restate:9070
+    entrypoint:
+      - restate
+      - -y
+      - deployments
+      - register
+      - --force
+      - http://api:9080
+    depends_on:
+      api:
+        condition: service_healthy
+      restate:
+        condition: service_healthy
+    restart: on-failure:5
     networks: [wallet]
 
 volumes:
   postgres-data:
   restate-data:
+  pgadmin-data:
 
 networks:
   wallet:
