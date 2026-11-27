@@ -29,3 +29,16 @@ class TransactionCreate(BaseModel):
     user_id: int
     kind:TransactionKind
     idempotency_key: str
+
+class TransferCreate(BaseModel):
+    amount: int
+    from_user_id: int
+    to_user_id: int
+
+class TransferResponse(BaseModel):
+    transaction_id: int
+    from_user_account_id: int
+    to_user_account_id: int
+    amount: int
+
+    model_config = ConfigDict(from_attributes=True)

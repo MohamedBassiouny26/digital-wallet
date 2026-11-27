@@ -1,12 +1,12 @@
 import restate
 
 from app.db.enums import Side
-from app.db.repo import create_transaction, get_deposits_processing_accounts_by_user_id
+from app.db.repo import create_transaction, get_deposits_processing_accounts_by_user_id, get_users_accounts
 from app.db.seed import wallet_name
 from app.db.session import session_scope
 from app.models.entry import EntryCreate, EntryResponse
 from app.db import create_entry as db_create_entry
-from app.models.transactions import DepositCreate, DepositResponse, TransactionCreate, TransactionKind
+from app.models.transactions import DepositCreate, DepositResponse, TransactionCreate, TransactionKind, TransferCreate, TransferResponse
 
 transaction_service = restate.Service("transaction_service")
 
@@ -57,6 +57,38 @@ async def deposit(ctx: restate.Context, deposit: DepositCreate) -> DepositRespon
             transaction_id=transaction_id, account_id=cash_account.id, side=_get_direction_for_account(cash_account, OperationEnum.ADD), amount=net_amount
         ))
     return DepositResponse(transaction_id=transaction_id, user_account_id=user_account.id, amount=deposit.amount)
+
+@transaction_service.handler()
+async def transfer(ctx: restate.Context, transfer: TransferCreate) -> TransferResponse:
+    # Steps:
+    # 1. get all need accounts for users from_user_id and to_user_id account
+    # 2. create a transaction
+    # 3. create an entry for the transaction
+    # 4. create depit entry for the from_user_id account
+    # 5. create credit entry for the to_user_id account
+    idempotency_key = ctx.request().headers.get("idempotency-key")
+    transaction = TransactionCreate(
+            amount=transfer.amount,
+            user_id=transfer.from_user_id,
+            kind=TransactionKind.TRANSFER,
+            idempotency_key=idempotency_key or str(ctx.uuid())
+    )
+    async with session_scope() as session:
+        users_account=await get_users_accounts(session, [transfer.from_user_id, transfer.to_user_id])
+        from_user_account=__filter_account_by_name(users_account, wallet_name(user_id=transfer.from_user_id))
+        to_user_account=__filter_account_by_name(users_account, wallet_name(user_id=transfer.to_user_id))
+        # create transaction
+        transaction_id = await create_transaction(session, transaction)
+        # create depit entry for the from_user_id account
+        await db_create_entry(session, EntryCreate(
+            transaction_id=transaction_id, account_id=from_user_account.id, side=_get_direction_for_account(from_user_account, OperationEnum.SUBTRACT), amount=transfer.amount
+        ))
+        # create credit entry for the to_user_id account
+        await db_create_entry(session, EntryCreate(
+            transaction_id=transaction_id, account_id=to_user_account.id, side=_get_direction_for_account(to_user_account, OperationEnum.ADD), amount=transfer.amount
+        ))
+    return TransferResponse(transaction_id=transaction_id, from_user_account_id=from_user_account.id, to_user_account_id=to_user_account.id, amount=transfer.amount)
+
 
 
 def __filter_account_by_name(accounts, name: str):

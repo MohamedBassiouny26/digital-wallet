@@ -48,6 +48,18 @@ async def get_deposits_processing_accounts_by_user_id(
     result = await session.execute(stmt)
     return result.scalars().all()
 
+async def get_users_accounts(
+    session: AsyncSession, user_id: list[int]
+) -> Sequence[Account]:
+    """The three accounts a deposit posts to: the user's wallet, Cash, and fees."""
+    stmt = select(Account).where(
+        or_(
+            Account.user_id.in_(user_id),
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
 
 ### Transactions
 async def create_transaction(session: AsyncSession, transaction) -> int:
