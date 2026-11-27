@@ -1,6 +1,7 @@
 from typing import List, Sequence
 
 from sqlalchemy import case, func, insert, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Account, Entry, Transaction
@@ -62,20 +63,36 @@ async def get_users_accounts(
 
 
 ### Transactions
-async def create_transaction(session: AsyncSession, transaction) -> int:
-    """Create a new transaction in the database."""
+async def create_transaction(session: AsyncSession, transaction) -> int | None:
+    """Insert a transaction, or return None if its idempotency key is taken.
+
+    `ctx.run` is at-least-once: a step can commit and still be re-run if the
+    process dies before Restate journals the result. ON CONFLICT DO NOTHING is
+    what makes that re-run a no-op instead of a second posting.
+    """
     # Only the columns `transactions` actually has: amount and user_id live on
     # the entries, not on the transaction itself.
     stmt = (
-        insert(Transaction)
+        pg_insert(Transaction)
         .values(
             kind=transaction.kind.value,
             idempotency_key=transaction.idempotency_key,
         )
+        .on_conflict_do_nothing(index_elements=[Transaction.idempotency_key])
         .returning(Transaction.id)
     )
     result = await session.execute(stmt)
-    return result.scalar_one()
+    return result.scalar_one_or_none()
+
+
+async def get_transaction_id_by_idempotency_key(
+    session: AsyncSession, idempotency_key: str
+) -> int:
+    """The id of an already-posted transaction, for replaying a duplicate step."""
+    stmt = select(Transaction.id).where(
+        Transaction.idempotency_key == idempotency_key
+    )
+    return (await session.execute(stmt)).scalar_one()
 
 ### Balance
 async def get_user_balance(session: AsyncSession, user_id: int) -> AccountBalance:
