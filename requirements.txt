@@ -1,5 +1,5 @@
 # --- Restate (durable execution) ---
-restate-sdk[serde]>=1.2.0
+restate-sdk[serde]>=1.5.4
 
 # --- API / app ---
 fastapi>=0.115.0

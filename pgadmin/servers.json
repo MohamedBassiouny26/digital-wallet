@@ -1,0 +1,15 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "wallet",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "wallet",
+      "Username": "wallet",
+      "PassFile": "/pgpass",
+      "SSLMode": "prefer",
+      "Comment": "Local wallet ledger database (docker compose)."
+    }
+  }
+}

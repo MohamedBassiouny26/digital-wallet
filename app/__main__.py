@@ -6,8 +6,9 @@ import hypercorn.asyncio
 import restate
 
 from app.health import health
+from app.transaction_service import transaction_service
 
-app = restate.app(services=[health])
+app = restate.app(services=[health,transaction_service])
 
 
 def main() -> None:
