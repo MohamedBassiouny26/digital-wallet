@@ -9,3 +9,9 @@ class Account(BaseModel):
     user_id: int | None
 
     model_config = ConfigDict(from_attributes=True)
+
+class AccountBalance(BaseModel):
+    balance: int
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
